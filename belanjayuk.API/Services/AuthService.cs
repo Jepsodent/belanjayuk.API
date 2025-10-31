@@ -2,6 +2,7 @@
 using belanjayuk.API.Models.DTO;
 using belanjayuk.API.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using BCrypt.Net;
 
 namespace belanjayuk.API.Services
 {
@@ -56,11 +57,13 @@ namespace belanjayuk.API.Services
                 IsActive = true
             };
 
+            var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
+
             var newPassword = new Models.Entities.MsUserPassword
             {
                 IdUserPassword = Guid.NewGuid().ToString(),
                 IdUser = newUser.IdUser,
-                PasswordHashed = request.Password, //TODO: Nanti ganti sama bcrypt ya!
+                PasswordHashed = hashedPassword,
                 DateIn = DateTime.Now,
                 IsActive = true,                
             };
@@ -108,11 +111,53 @@ namespace belanjayuk.API.Services
 
         public async Task<APIResponseDto<UserResponseDto>> LoginUser(LoginRequestDto request)
         {
-            return new APIResponseDto<UserResponseDto>
+            var userExist = await _context.MsUsers.FirstOrDefaultAsync(u => u.Email == request.PhoneOrEmail || u.PhoneNumber == request.PhoneOrEmail);
+
+            if(userExist == null || userExist.IsActive == false)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "User not found or inactive",
+                    Data = null
+                };
+            }
+            var userPassword = await _context.MsUserPasswords.FirstOrDefaultAsync(p => p.IdUser == userExist.IdUser && p.IsActive == true);
+            if(userPassword == null)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "Password is not found", 
+                    Data = null
+                };
+            }
+
+            var isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, userPassword.PasswordHashed);
+
+            if (!isPasswordValid)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "Invalid password",
+                    Data = null
+                };
+            }
+
+            var responseData = new UserResponseDto
+            {
+                IdUser = userExist.IdUser,
+                UserName = userExist.UserName,
+                Email = userExist.Email,
+                Token = "DUMMY DULU BOS" // TODO : Implement JWT TOKEN nanti
+            };
+
+                return new APIResponseDto<UserResponseDto>
             {
                 IsSuccess = true,
                 Message = "Successfully login",
-                Data = null
+                Data = responseData
             };
         }
 

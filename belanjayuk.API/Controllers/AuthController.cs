@@ -35,16 +35,15 @@ namespace belanjayuk.API.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto request)
         {
-            //TODO : Implement login services
-            //var result = await _authService.LoginUser(request);
-            //if(result.IsSuccess)
-            //{
-            //    return Ok(result);
-            //}
-            //else
-            //{
-            //    return BadRequest(result);
-            //}
+            var result = await _authService.LoginUser(request);
+            if (result.IsSuccess)
+            {
+                return Ok(result);
+            }
+            else
+            {
+                return BadRequest(result);
+            }
 
             throw new NotImplementedException();
         }
