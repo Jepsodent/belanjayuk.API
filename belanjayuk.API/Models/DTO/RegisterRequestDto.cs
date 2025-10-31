@@ -11,5 +11,6 @@
         public DateTime? DOB { get; set; }
         // Dari LtGender
         public string? IdGender { get; set; }
+        public HomeAddressDto? PrimaryAddress { get; set;}
     }
 }
