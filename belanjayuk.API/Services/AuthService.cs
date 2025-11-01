@@ -15,7 +15,7 @@ namespace belanjayuk.API.Services
         }
         public async Task<APIResponseDto<UserResponseDto>> RegisterUser(RegisterRequestDto request)
         {
-            var userExist = await _context.MsUsers.AnyAsync(u => u.UserName == request.UserName || u.Email == request.Email);
+            var userExist = await _context.MsUsers.AnyAsync(u => u.Email == request.Email || u.PhoneNumber== request.PhoneNumber);
 
             if (userExist)
             {
@@ -42,9 +42,22 @@ namespace belanjayuk.API.Services
                 }
             }
 
+            var lastUserId =  await _context.MsUsers.OrderByDescending(u => u.IdUser).Select(u => u.IdUser).FirstOrDefaultAsync();
+            int nextNumber = 1;
+            if (!string.IsNullOrEmpty(lastUserId) && lastUserId.StartsWith("USR"))
+            {
+                var number = lastUserId.Substring(3);
+                if(int.TryParse(number, out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+
+            }
+
+
             var newUser = new Models.Entities.MsUser
             {
-                IdUser = Guid.NewGuid().ToString(),
+                IdUser = "USR" + nextNumber.ToString("D3"),
                 UserName = request.UserName,
                 Email = request.Email,
                 FirstName = request.FirstName,
@@ -59,9 +72,24 @@ namespace belanjayuk.API.Services
 
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Password);
 
+
+
+
+            var lastPasswordId = await _context.MsUserPasswords.OrderByDescending(u => u.IdUserPassword).Select(u => u.IdUserPassword).FirstOrDefaultAsync();
+            nextNumber = 1;
+            if (!string.IsNullOrEmpty(lastPasswordId) && lastPasswordId.StartsWith("PASS"))
+            {
+                var number = lastPasswordId.Substring(4);
+                if (int.TryParse(number, out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+
+            }
+
             var newPassword = new Models.Entities.MsUserPassword
             {
-                IdUserPassword = Guid.NewGuid().ToString(),
+                IdUserPassword = "PASS" + nextNumber.ToString("D3"),
                 IdUser = newUser.IdUser,
                 PasswordHashed = hashedPassword,
                 DateIn = DateTime.Now,
@@ -74,10 +102,21 @@ namespace belanjayuk.API.Services
 
             if(request.PrimaryAddress != null)
             {
-                // TODO: Tambahin validasi kalau mau disisi frontend (panjang char dll)
+
+                var lastAddressId = await _context.TrHomeAddresses.OrderByDescending(u => u.IdHomeAddress).Select(u => u.IdHomeAddress).FirstOrDefaultAsync();
+                nextNumber = 1;
+                if (!string.IsNullOrEmpty(lastAddressId) && lastAddressId.StartsWith("HADDR"))
+                {
+                    var number = lastAddressId.Substring(5);
+                    if (int.TryParse(number, out int lastNumber))
+                    {
+                        nextNumber = lastNumber + 1;
+                    }
+
+                }
                 var newAddress = new Models.Entities.TrHomeAddress
                 {
-                    IdHomeAddress = Guid.NewGuid().ToString(),
+                    IdHomeAddress = "HADDR" + nextNumber.ToString("D3"),
                     IdUser = newUser.IdUser,
                     Provinsi = request.PrimaryAddress.Provinsi,
                     KotaKabupaten = request.PrimaryAddress.KotaKabupaten,
@@ -97,7 +136,7 @@ namespace belanjayuk.API.Services
                 Email = newUser.Email,
                 UserName = newUser.UserName,
                 IdUser = newUser.IdUser,
-                Token = null //TODO: generate jwt token ya
+                Token = null
             };
 
             return new APIResponseDto<UserResponseDto>
@@ -107,7 +146,6 @@ namespace belanjayuk.API.Services
                 Data = responseData
             };
         }
-
 
         public async Task<APIResponseDto<UserResponseDto>> LoginUser(LoginRequestDto request)
         {
