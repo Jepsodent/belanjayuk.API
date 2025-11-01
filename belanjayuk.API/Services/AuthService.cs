@@ -1,8 +1,9 @@
-﻿using belanjayuk.API.Data;
+﻿using BCrypt.Net;
+using belanjayuk.API.Data;
 using belanjayuk.API.Models.DTO;
 using belanjayuk.API.Models.Entities;
 using Microsoft.EntityFrameworkCore;
-using BCrypt.Net;
+using System.Data;
 
 namespace belanjayuk.API.Services
 {
@@ -184,8 +185,8 @@ namespace belanjayuk.API.Services
                     Data = null
                 };
             }
-
-            var token = _jwtService.GenerateJwtToken(userExist);
+            
+            var token = _jwtService.GenerateJwtToken(userExist, new List<string> { "Buyer" });
 
             var responseData = new UserResponseDto
             {
@@ -199,6 +200,126 @@ namespace belanjayuk.API.Services
             {
                 IsSuccess = true,
                 Message = "Successfully login",
+                Data = responseData
+            };
+        }
+        public async Task<APIResponseDto<UserResponseDto>> RegisterSeller(string userId, RegisterSellerRequestDto request)
+        {
+            var sellerExist = await _context.MsUserSellers.AnyAsync(s => s.IdUser == userId);
+            if (sellerExist)
+            {
+                return new APIResponseDto<UserResponseDto>
+                { IsSuccess = false, Message = "Anda sudah terdaftar sebagai penjual.", Data = null };
+            }
+
+            var storeNameExist = await _context.MsUserSellers.AnyAsync(s => s.StoreName == request.StoreName);
+            if (storeNameExist)
+            {
+                return new APIResponseDto<UserResponseDto>
+                { IsSuccess = false, Message = "Nama toko sudah digunakan, silakan pilih nama lain.", Data = null };
+            }
+
+            var user = await _context.MsUsers.FirstOrDefaultAsync(u => u.IdUser == userId);
+            if (user == null)
+            {
+                return new APIResponseDto<UserResponseDto>
+                { IsSuccess = false, Message = "User tidak ditemukan.", Data = null };
+            }
+
+            var lastSellerId = await _context.MsUserSellers
+                .OrderByDescending(s => s.IdUserSeller)
+                .Select(s => s.IdUserSeller)
+                .FirstOrDefaultAsync();
+
+            int nextNumber = 1;
+            if (!string.IsNullOrEmpty(lastSellerId) && lastSellerId.StartsWith("SEL"))
+            {
+
+                if (int.TryParse(lastSellerId.Substring(3), out int lastNumber))
+                {
+                    nextNumber = lastNumber + 1;
+                }
+            }
+
+            var newSeller = new MsUserSeller
+            {
+                IdUserSeller = "SEL" + nextNumber.ToString("D3"),
+                IdUser = userId,
+                StoreName = request.StoreName,
+                SellerDesc = request.SellerDesc,
+                Address = request.Address,
+                PhoneNumber = request.PhoneNumber,
+                Email = user.Email,
+                DateIn = DateTime.Now,
+                IsActive = true
+            };
+            _context.MsUserSellers.Add(newSeller);
+            await _context.SaveChangesAsync();
+            var responseData = new UserResponseDto
+            {
+                IdUser = user.IdUser,
+                UserName = user.UserName,
+                Email = user.Email,
+                Token = null // LOGIN ULANG SETELAH MENJADI PENJUAL BUAT DAPET TOKEN
+            };
+
+            return new APIResponseDto<UserResponseDto> { IsSuccess = true, Message = $"Toko {request.StoreName} berhasil didaftarkan. Silakan Login ulang.", Data = responseData };
+        }
+        public async Task<APIResponseDto<UserResponseDto>> LoginSeller(LoginRequestDto request)
+        {
+            var userExist = await _context.MsUsers.FirstOrDefaultAsync(u => u.Email == request.PhoneOrEmail || u.PhoneNumber == request.PhoneOrEmail);
+            if (userExist == null || userExist.IsActive == false)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "User not found or inactive",
+                    Data = null
+                };
+            }
+            var sellerExist = await _context.MsUserSellers.AnyAsync(s => s.IdUser == userExist.IdUser);
+            if (!sellerExist)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "User is not registered as a seller",
+                    Data = null
+                };
+            }
+
+            var userPassword = await _context.MsUserPasswords.FirstOrDefaultAsync(p => p.IdUser == userExist.IdUser && p.IsActive == true);
+            if (userPassword == null)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "Password is not found",
+                    Data = null
+                };
+            }
+            var isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, userPassword.PasswordHashed);
+            if (!isPasswordValid)
+            {
+                return new APIResponseDto<UserResponseDto>
+                {
+                    IsSuccess = false,
+                    Message = "Invalid password",
+                    Data = null
+                };
+            }
+            var token = _jwtService.GenerateJwtToken(userExist, new List<string> { "Buyer" , "Seller" });
+            var responseData = new UserResponseDto
+            {
+                IdUser = userExist.IdUser,
+                UserName = userExist.UserName,
+                Email = userExist.Email,
+                Token = token
+            };
+            return new APIResponseDto<UserResponseDto>
+            {
+                IsSuccess = true,
+                Message = "Successfully login as seller",
                 Data = responseData
             };
         }

@@ -15,13 +15,13 @@ namespace belanjayuk.API.Services
             _configuration = configuration;
         }
 
-        public string GenerateJwtToken(MsUser User)
+        public string GenerateJwtToken(MsUser User, List<string> roles)
         {
             var key = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key is not configured.");
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            var claims = new[]
+            var claims = new List<Claim>
             {
                 new Claim(JwtRegisteredClaimNames.Sub, User.IdUser),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
@@ -29,6 +29,11 @@ namespace belanjayuk.API.Services
                 new Claim("Username" , User.UserName),
                 new Claim("Email" , User.Email),
             };
+
+            foreach(var role in roles)
+            {
+                claims.Add(new Claim("Role", role));
+            }
 
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],

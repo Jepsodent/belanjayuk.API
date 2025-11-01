@@ -4,7 +4,7 @@ namespace belanjayuk.API.Services
 {
     public interface IJwtService
     {
-        string GenerateJwtToken(MsUser user);
+        string GenerateJwtToken(MsUser user , List<string> roles);
 
 
     }
