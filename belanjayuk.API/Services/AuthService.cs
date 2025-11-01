@@ -9,9 +9,11 @@ namespace belanjayuk.API.Services
     public class AuthService : IAuthService
     {
         private readonly BelanjaYukDbContext _context;
-        public AuthService(BelanjaYukDbContext context)
+        private readonly IJwtService _jwtService;
+        public AuthService(BelanjaYukDbContext context, IJwtService jwtService)
         {
             _context = context;
+            _jwtService = jwtService;
         }
         public async Task<APIResponseDto<UserResponseDto>> RegisterUser(RegisterRequestDto request)
         {
@@ -183,12 +185,14 @@ namespace belanjayuk.API.Services
                 };
             }
 
+            var token = _jwtService.GenerateJwtToken(userExist);
+
             var responseData = new UserResponseDto
             {
                 IdUser = userExist.IdUser,
                 UserName = userExist.UserName,
                 Email = userExist.Email,
-                Token = "DUMMY DULU BOS" // TODO : Implement JWT TOKEN nanti
+                Token =  token 
             };
 
                 return new APIResponseDto<UserResponseDto>
